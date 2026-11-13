@@ -79,7 +79,8 @@ class LargeScaleTomographer(object):
     def __init__(self, sacc_file, gal_names, map_names, comp_names,
                  tracer_classes, maps_in_x='all', seds=None,
                  n_max=1, kmax=0.3, lmax=None, lmin=0, map_spin=0,
-                 cosmo=None, include_stochasticity=True):
+                 cosmo=None, include_stochasticity=True,
+                 beam_corrected_in_sacc=False):
         self.s = sacc_file
         self.gal_names = gal_names
         self.map_names = map_names
@@ -95,6 +96,7 @@ class LargeScaleTomographer(object):
         self.lmax = lmax
         self.lmin = lmin
         self.map_spin = map_spin
+        self.beam_corrected_in_sacc = beam_corrected_in_sacc
         if cosmo is None:
             cosmo = ccl.CosmologyVanillaLCDM()
 
@@ -179,6 +181,7 @@ class LargeScaleTomographer(object):
                     for map_name in self.maps_in_x[gal_name]:
                         t_map = self.map_tracers[(comp_name, map_name)]
                         sed = self.seds[(comp_name, map_name)]
+                        beam = self.tracer_data[map_name]['beam'](ell)
                         for t in self.terms:
                             cl = ccl.angular_cl(
                                 self.cosmo,
@@ -186,7 +189,7 @@ class LargeScaleTomographer(object):
                                 t_map,
                                 ell,
                                 p_of_k_a=self.pks[t])
-                            self.th_cls_gm[(gal_name, map_name, comp_name, t)] = cl*sed
+                            self.th_cls_gm[(gal_name, map_name, comp_name, t)] = cl*sed*beam
                 else:
                     # We can avoid computing all cls, since
                     # the same tracer is used for all maps.
@@ -200,7 +203,8 @@ class LargeScaleTomographer(object):
                             p_of_k_a=self.pks[t])
                         for map_name in self.maps_in_x[gal_name]:
                             sed = self.seds[(comp_name, map_name)]
-                            self.th_cls_gm[(gal_name, map_name, comp_name, t)] = cl*sed
+                            beam = self.tracer_data[map_name]['beam'](ell)
+                            self.th_cls_gm[(gal_name, map_name, comp_name, t)] = cl*sed*beam
 
         # Build template matrices
         blocks = []
@@ -385,7 +389,12 @@ class LargeScaleTomographer(object):
         for map_name in self.map_names:
             t = self.s.tracers[map_name]
             if hasattr(t, 'beam'):
-                beam = interp1d(t.ell, t.beam, bounds_error=False, fill_value=0)
+                if self.beam_corrected_in_sacc:
+                    beam = _ones
+                else:
+                    beam = interp1d(t.ell, t.beam,
+                                    bounds_error=False,
+                                    fill_value=1.0)
             else:
                 beam = _ones
             self.tracer_data[map_name] = {'beam': beam}
