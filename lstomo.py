@@ -85,7 +85,7 @@ class LargeScaleTomographer(object):
         if cosmo is None:
             cosmo = ccl.CosmologyVanillaLCDM()
 
-        self._check_sanity()
+        self._check_sanity(seds)
         self._collect_tracer_data()
         self._get_data_vector()
         self._build_amp_indices()
@@ -221,8 +221,8 @@ class LargeScaleTomographer(object):
             for t in self.terms:
                 self.amp_indices[f'{gal_name}_{gal_name}_{t}'] = i
                 i += 1
-            for comp_name in self.comp_names:
-                for t in self.terms:
+            for t in self.terms:
+                for comp_name in self.comp_names:
                     self.amp_indices[f'{gal_name}_{comp_name}_{t}'] = i
                     i += 1
 
@@ -298,7 +298,7 @@ class LargeScaleTomographer(object):
                     for map_name in self.map_names:
                         self.seds[(comp_name, map_name)] = 1
 
-    def _check_sanity(self):
+    def _check_sanity(self, seds_input):
         """ Check that the provided inputs are consistent and valid."""
         # Check all galaxy tracers and maps are present in the SACC file
         for gal_name in self.gal_names:
@@ -333,7 +333,7 @@ class LargeScaleTomographer(object):
                         raise ValueError(f"Tracer class for component {comp_name} "
                                          f"in map {map_name} not provided.")
             else:  # If not defined per map, then this component must have an SED
-                if self.seds is None or comp_name not in self.seds:
+                if seds_input is None or comp_name not in seds_input:
                     raise ValueError(f"SED for component {comp_name} not provided.")
 
         # Determine the appropriate cl_type for each map based on its spin

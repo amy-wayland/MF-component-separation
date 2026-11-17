@@ -92,7 +92,7 @@ class BPass(object):
         self.unit_MJy_sr_to_K_CMB = self.integrate_over_tau(dBnudlogT)/T_CMB
         self.unit_MJy_sr_to_K_CMB_fast = self.integrate_over_tau(dBnudlogT, fast=True)/T_CMB
 
-    def integrate_over_tau(self, func, fast=False):
+    def integrate_over_tau(self, func, fast=False, axis=-1):
         """
         Integrate the given function over the bandpass.
 
@@ -103,6 +103,8 @@ class BPass(object):
             and returns a value (in any units).
         fast : bool, optional
             If True, use a faster but less accurate integration method.
+        axis : int, optional
+            The axis along which to integrate. Default is -1 (last axis).
 
         Returns
         -------
@@ -111,10 +113,10 @@ class BPass(object):
         """
         if fast:
             return np.trapezoid(func(self.nu_fast)*self.tau_fast,
-                                self.nu_fast)*self.norm_fast
-        return np.trapezoid(func(self.nu)*self.tau, self.nu)*self.norm
+                                self.nu_fast, axis=axis)*self.norm_fast
+        return np.trapezoid(func(self.nu)*self.tau, self.nu, axis=axis)*self.norm
 
-    def convolve(self, sed_func, fast=False):
+    def convolve(self, sed_func, fast=False, axis=-1):
         """
         Convolve the given SED with the bandpass.
 
@@ -125,6 +127,8 @@ class BPass(object):
             and returns the SED (in MJy/sr).
         fast : bool, optional
             If True, use a faster but less accurate convolution method.
+        axis : int, optional
+            The axis along which to convolve. Default is -1 (last axis).
 
         Returns
         -------
@@ -132,5 +136,5 @@ class BPass(object):
             The bandpass-convolved SED value in units of K_CMB.
         """
         if fast:
-            return self.integrate_over_tau(sed_func, fast=True)/self.unit_MJy_sr_to_K_CMB_fast
-        return self.integrate_over_tau(sed_func, fast=fast)/self.unit_MJy_sr_to_K_CMB
+            return self.integrate_over_tau(sed_func, fast=True, axis=axis)/self.unit_MJy_sr_to_K_CMB_fast
+        return self.integrate_over_tau(sed_func, fast=fast, axis=axis)/self.unit_MJy_sr_to_K_CMB
