@@ -6,12 +6,12 @@ def _ones(ell):
 
 
 def _cltyp(map_spin):
-    if map_spin==0:
+    if map_spin == 0:
         return 'cl_00'
-    elif map_spin==2:
+    elif map_spin == 2:
         return 'cl_0e'
     elif map_spin in ['e', 'b']:
-        return f'cl_0{map_spin}' 
+        return f'cl_0{map_spin}'
     else:
         raise ValueError(f"Invalid map_spin value: {map_spin}. "
                          "Must be 0, 2, 'e', or 'b'.")

@@ -3,7 +3,6 @@ from scipy.io import readsav
 from scipy.interpolate import RegularGridInterpolator
 
 
-
 class SIDESBethermin(object):
     """
     Class to build CIB SED from Bethermin 2017 model.
@@ -76,28 +75,36 @@ class SIDESBethermin(object):
         z : float or array-like
             Redshift(s) at which to compute the flux density.
         nu_ghz : float or array-like
-            Observed frequency(ies) in GHz at which to compute the flux density.
+            Observed frequency(ies) in GHz at which to compute the
+            flux density.
         sb_frac_at_z0 : float, optional
             Fraction of starburst galaxies at z=0. Default is 0.015.
         sb_frac_at_zsat : float, optional
-            Fraction of starburst galaxies at saturation redshift. Default is 0.030.
+            Fraction of starburst galaxies at saturation redshift.
+            Default is 0.030.
         sb_zsat : float, optional
             Saturation redshift for starburst fraction. Default is 1.0.
         logU_ms_int : float, optional
-            Logarithm of the mean radiation field intensity for main sequence galaxies at z=0. Default is log10(5.0).
+            Logarithm of the mean radiation field intensity for main sequence
+            galaxies at z=0. Default is log10(5.0).
         logU_ms_slope : float, optional
-            Slope of the redshift evolution of the mean radiation field intensity for main sequence galaxies. Default is 0.25.
+            Slope of the redshift evolution of the mean radiation field
+            intensity for main sequence galaxies. Default is 0.25.
         Ums_zsat : float, optional
-            Saturation redshift for the mean radiation field intensity of main sequence galaxies. Default is 4.0.
+            Saturation redshift for the mean radiation field intensity of
+            main sequence galaxies. Default is 4.0.
         logU_sb_int : float, optional
-            Logarithm of the mean radiation field intensity for starburst galaxies at z=0. Default is log10(31.0).
+            Logarithm of the mean radiation field intensity for starburst
+            galaxies at z=0. Default is log10(31.0).
         logU_sb_slope : float, optional
-            Slope of the redshift evolution of the mean radiation field intensity for starburst galaxies. Default is 0.0.
+            Slope of the redshift evolution of the mean radiation field
+            intensity for starburst galaxies. Default is 0.0.
 
         Returns
         -------
         nuLnu : float or array-like
-            The mixed luminosity at the given redshift(s) and frequency(ies).
+            The mixed luminosity at the given redshift(s) and
+            frequency(ies).
         """
         nu_rf = nu_ghz * 1E9 * (1 + z)
         lambda_rf = self.c / nu_rf
@@ -115,7 +122,8 @@ class SIDESBethermin(object):
         # where alpha is 0.25 and intercept is log10(5) from Bethermin17
         log10U_ms = logU_ms_int + logU_ms_slope * z
         U_ms = 10 ** log10U_ms
-        U_ms = np.where(z >= Ums_zsat, 10 ** (logU_ms_int + logU_ms_slope * Ums_zsat), U_ms)
+        U_ms = np.where(z >= Ums_zsat,
+                        10**(logU_ms_int+logU_ms_slope*Ums_zsat), U_ms)
 
         # For SB galaxies, there is no redshift evolution in Bethermin17
         log10U_sb = logU_sb_int + logU_sb_slope * z
@@ -134,7 +142,8 @@ class SIDESBethermin(object):
         Parameters
         ----------
         nu_ghz : float or array-like
-            Observed frequency(ies) in GHz at which to compute the flux density.
+            Observed frequency(ies) in GHz at which to compute
+            the flux density.
         z : array-like
             Redshift grid.
         wz : array-like
@@ -150,7 +159,7 @@ class SIDESBethermin(object):
         sed = self.sed_grid(z, nu_ghz, cosmo, **kwargs)
         return norm * np.trapezoid(wz * sed, z, axis=-1)
 
-    def sed_grid(self, 
+    def sed_grid(self,
                  z,
                  nu_ghz,
                  cosmo,
@@ -180,11 +189,8 @@ class SIDESBethermin(object):
             sb_zsat=sb_zsat,
         )
         dist = cosmo.luminosity_distance(1/(1+z)) * self.Mpc_to_m
-        #dist = cosmo.luminosity_distance(1/(1+Z.flatten())) * self.Mpc_to_m
-        #dist = dist.reshape(Z.shape)
         nuSnu = nuLnu / (4 * np.pi * dist[None, :]**2)
         Snu = nuSnu / (1E9*nu_ghz[:, None])
         Snu *= self.w_MJy * self.L_sun
 
         return Snu
-

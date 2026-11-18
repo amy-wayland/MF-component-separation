@@ -1,6 +1,5 @@
 import numpy as np
 import scipy.linalg as la
-import sacc
 from .utils import _cltyp, _ones
 from scipy.interpolate import interp1d
 
@@ -48,7 +47,8 @@ class MaxLikeBandpowerReconstructor(object):
         for comp_name in self.comp_names:
             seds_full[comp_name] = {}
             if comp_name not in seds:
-                raise ValueError(f"SED for component {comp_name} not found in seds.")
+                raise ValueError(f"SED for component {comp_name} "
+                                 f"not found in seds.")
             sed = seds[comp_name].copy()
             # Check if SEDs are defined per lss tracer or globally
             lss_in_each = [lss_name in sed for lss_name in self.lss_names]
@@ -62,7 +62,8 @@ class MaxLikeBandpowerReconstructor(object):
                 for map_name in self.map_names:
                     if map_name not in sed:
                         raise ValueError(f"SED for component {comp_name} "
-                                         f"does not have an entry for map {map_name}.")
+                                         f"does not have an entry for "
+                                         f"map {map_name}.")
                 # Assign the global SED to each lss tracer
                 for lss_name in self.lss_names:
                     seds_full[comp_name][lss_name] = sed
@@ -72,9 +73,10 @@ class MaxLikeBandpowerReconstructor(object):
                 for lss_name in self.lss_names:
                     for map_name in self.maps_in_x[lss_name]:
                         if map_name not in seds_full[comp_name][lss_name]:
-                            raise ValueError(f"SED for component {comp_name} does not have "
-                                             f"an entry for map {map_name} in LSS "
-                                             f"tracer {lss_name}.")
+                            raise ValueError(
+                                f"SED for component {comp_name} does not have "
+                                f"an entry for map {map_name} in LSS "
+                                f"tracer {lss_name}.")
         self.seds = seds_full
         self._build_s_matrix()
 
@@ -82,33 +84,44 @@ class MaxLikeBandpowerReconstructor(object):
         # Check that all lss tracers exist in the sacc file
         for lss_name in self.lss_names:
             if lss_name not in self.s.tracers:
-                raise ValueError(f"LSS tracer {lss_name} not found in sacc file.")
+                raise ValueError(
+                    f"LSS tracer {lss_name} not found in sacc file.")
         # Check that all map tracers exist in the sacc file
         for map_name in self.map_names:
             if map_name not in self.s.tracers:
-                raise ValueError(f"Map tracer {map_name} not found in sacc file.")
-        # If maps_in_x is not 'all', check that the specified cross-maps are valid
+                raise ValueError(
+                    f"Map tracer {map_name} not found in sacc file.")
+        # If maps_in_x is not 'all', check that the
+        # specified cross-maps are valid
         if self.maps_in_x != 'all':
             for lss_name in self.lss_names:
                 if lss_name not in self.maps_in_x:
-                    raise ValueError(f"LSS tracer {lss_name} not found in maps_in_x.")
+                    raise ValueError(
+                        f"LSS tracer {lss_name} not found in maps_in_x.")
                 for map_name in self.maps_in_x[lss_name]:
                     if map_name not in self.map_names:
-                        raise ValueError(f"Map tracer {map_name} not found in maps_in_x for LSS tracer {lss_name}.")
+                        raise ValueError(
+                            f"Map tracer {map_name} not found in "
+                            f"maps_in_x for LSS tracer {lss_name}.")
         else:
-            # If maps_in_x is 'all', create a dictionary with all maps for each lss tracer
-            self.maps_in_x = {lss_name: self.map_names for lss_name in self.lss_names}
+            # If maps_in_x is 'all', create a dictionary
+            # with all maps for each lss tracer
+            self.maps_in_x = {lss_name: self.map_names
+                              for lss_name in self.lss_names}
 
         # Determine the appropriate cl_type for each map based on its spin
         if np.isscalar(self.lss_spin):
-            self.clxtype = {n: _cltyp(self.lss_spin) for n in self.lss_names}
+            self.clxtype = {n: _cltyp(self.lss_spin)
+                            for n in self.lss_names}
         elif isinstance(self.lss_spin, dict):
-            self.clxtype = {n: _cltyp(self.map_spin[n]) for n in self.lss_names}
+            self.clxtype = {n: _cltyp(self.map_spin[n])
+                            for n in self.lss_names}
         else:
-            raise ValueError("lss_spin must be either a scalar or a dictionary mapping lss tracer names to spins.")
+            raise ValueError("lss_spin must be either a scalar or a "
+                             "dictionary mapping lss tracer names to spins.")
 
-        # lmax should be a scalar (applied to all cross-correlations) of a dictionary
-        # with a different lmax for each map.
+        # lmax should be a scalar (applied to all cross-correlations)
+        # of a dictionary with a different lmax for each map.
         if np.isscalar(self.lmax):
             self.lmax = {n: self.lmax for n in self.map_names}
         for m in self.map_names:
@@ -119,8 +132,9 @@ class MaxLikeBandpowerReconstructor(object):
         if self.beam_correction_kind in ['None', None]:
             self.beam_correction_kind = 'none'
         if self.beam_correction_kind not in ['mid', 'bpw', 'none']:
-            raise ValueError(f"Unkown beam correction kind {self.beam_correction_kind}. "
-                             f"Must be one of 'mid', 'bpw', or 'none'.")
+            raise ValueError(
+                f"Unkown beam correction kind {self.beam_correction_kind}. "
+                f"Must be one of 'mid', 'bpw', or 'none'.")
 
     def _collect_tracer_data(self):
         self.tracer_data = {}
@@ -154,9 +168,13 @@ class MaxLikeBandpowerReconstructor(object):
             ells_this, cls_this, cov_this, inds_this = [], [], [], []
             for map_name in self.maps_in_x[lss_name]:
                 cl_type = self.clxtype[lss_name]
-                ell, cl, cov, ind = self.s.get_ell_cl(cl_type, lss_name, map_name, return_cov=True, return_ind=True)
+                ell, cl, cov, ind = self.s.get_ell_cl(
+                    cl_type, lss_name, map_name,
+                    return_cov=True, return_ind=True)
                 if len(ell) == 0:
-                    ell, cl, cov, ind = self.s.get_ell_cl(cl_type, map_name, lss_name, return_cov=True, return_ind=True)
+                    ell, cl, cov, ind = self.s.get_ell_cl(
+                        cl_type, map_name, lss_name,
+                        return_cov=True, return_ind=True)
                 good = (ell >= self.lmin) & (ell <= self.lmax[map_name])
                 ell = ell[good]
                 cl = cl[good]
@@ -170,19 +188,22 @@ class MaxLikeBandpowerReconstructor(object):
                 inds.append(ind)
                 beam = self._eval_beam(self.tracer_data[map_name]['beam'],
                                        ell, ind)
-                self.cl_info[(lss_name, map_name)] = {'ell': ell, 'cl': cl, 'cov': cov,
-                                                      'ind': ind, 'n_ells': len(ell),
-                                                      'beam': beam}
+                self.cl_info[(lss_name, map_name)] = {
+                    'ell': ell, 'cl': cl, 'cov': cov, 'ind': ind,
+                    'n_ells': len(ell), 'beam': beam}
             ells_common = np.unique(np.concatenate(ells_this))
             ells_common.sort()
             self.common_ells[lss_name] = ells_common
             if len(ells_common) > np.amax([len(ell) for ell in ells_this]):
-                raise ValueError(f"Ells for LSS tracer {lss_name} do not match across maps.")
+                raise ValueError(
+                    f"Ells for LSS tracer {lss_name} do not "
+                    f"match across maps.")
             for i, map_name in enumerate(self.maps_in_x[lss_name]):
                 ell = ells_this[i]
                 # Find indices of this ell array in the common ell array
                 inds_in_common = np.searchsorted(ells_common, ell)
-                self.cl_info[(lss_name, map_name)]['inds_in_common'] = inds_in_common
+                self.cl_info[(lss_name,
+                              map_name)]['inds_in_common'] = inds_in_common
         self.data_vector = np.concatenate(data_vector)
         inds = np.concatenate(inds)
         self.cov = self.s.covariance.dense[inds][:, inds]
@@ -195,7 +216,6 @@ class MaxLikeBandpowerReconstructor(object):
             n_ells = len(ells_common)
             block_g = []
             for map_name in self.maps_in_x[lss_name]:
-                nls = self.cl_info[(lss_name, map_name)]['n_ells']
                 inds = self.cl_info[(lss_name, map_name)]['inds_in_common']
                 beam = self.cl_info[(lss_name, map_name)]['beam']
                 seds = np.array([self.seds[comp_name][lss_name][map_name]

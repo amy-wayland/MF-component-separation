@@ -24,18 +24,19 @@ class LargeScaleTomographer(object):
                where each tracer class is a callable that takes a cosmology
                object as its only argument, and returns a CCL tracer object.
                In this case, the same tracer class is used for all maps for
-               a given component. The corresponding map-component power spectrum
-               contribution will be scaled by the SED of that map-component pair
-               if present in `seds`.
-            2. A nested dictionary mapping component names to dictionaries that
-               map map names to tracer classes. In this case, different tracer
-               classes can be used for different maps for a given component. If
-               present, the SEDs for these map-component pairs will be used to
-               scale the corresponding power spectrum contributions.
+               a given component. The corresponding map-component power
+               spectrum contribution will be scaled by the SED of that
+               map-component pair if present in `seds`.
+            2. A nested dictionary mapping component names to dictionaries
+               that map map names to tracer classes. In this case, different
+               tracer classes can be used for different maps for a given
+               component. If present, the SEDs for these map-component
+               pairs will be used to scale the corresponding power spectrum
+               contributions.
         maps_in_x: Either 'all' or a dictionary mapping galaxy tracer
-            names to lists of map names for cross-correlations. If 'all', all
-            maps in `map_names` are used for cross-correlations with each galaxy
-            tracer.
+            names to lists of map names for cross-correlations. If 'all',
+            all maps in `map_names` are used for cross-correlations with
+            each galaxy tracer.
         seds: Optional dictionary mapping component names to their SEDs
             for each map. For any component-map pair not provided, the
             SED is assumed to be 1.
@@ -46,20 +47,22 @@ class LargeScaleTomographer(object):
             (default is 0.3).
         lmax: Maximum ell value for the analysis. If `kmax` is not `None`, this
             parameter is ignored. If a single number, this scale cut is
-            applied to all galaxy tracers. Otherwise, this should be a dictionary
-            mapping galaxy tracer names to their respective scale cuts. If `None`,
-            all scales present in the sacc file are used (default is `None`).
+            applied to all galaxy tracers. Otherwise, this should be a
+            dictionary mapping galaxy tracer names to their respective scale
+            cuts. If `None`, all scales present in the sacc file are used
+            (default is `None`).
         lmin: Minimum ell value for the analysis (default is 0).
         map_spin: Spin of the maps used. This may be a single value or a
-            dictionary mapping map names to spins. In all cases, allowed spin
-            values are 0, 2, 'e', and 'b'. If 0, the map is assumed to be a scalar
-            map. If 2, the map is assumed to be a spin-2 map, and only its e-mode
-            component is used. If 'e' or 'b', cross-correlations with the
-            corresponding spin component will be used (default is 0).
-        cosmo: Cosmology object to use in the calculation. If `None`, a vanilla
-            LCDM cosmology is used (default is `None`).
-        include_stochasticity: Whether to include a stochastic term in the model.
-            (default is True).
+            dictionary mapping map names to spins. In all cases, allowed
+            spin values are 0, 2, 'e', and 'b'. If 0, the map is assumed
+            to be a scalar map. If 2, the map is assumed to be a spin-2 map,
+            and only its E-mode component is used. If 'e' or 'b',
+            cross-correlations with the corresponding spin component will
+            be used (default is 0).
+        cosmo: Cosmology object to use in the calculation. If `None`, a
+            vanilla LCDM cosmology is used (default is `None`).
+        include_stochasticity: Whether to include a stochastic term in the
+            model. (default is True).
     """
     def __init__(self, sacc_file, gal_names, map_names, comp_names,
                  tracer_classes, maps_in_x='all', seds=None,
@@ -120,8 +123,9 @@ class LargeScaleTomographer(object):
         for i in range(1, self.n_max + 1):
             self.pks[f'k{2*i}'] = ccl.Pk2D(
                 a_arr=a_arr, lk_arr=lk_arr,
-                pk_arr=np.log(np.array([(k_arr/self.k_pivot)**(2*i) * pknl(k_arr, a)
-                                        for a in a_arr])),
+                pk_arr=np.log(np.array([
+                    (k_arr/self.k_pivot)**(2*i) * pknl(k_arr, a)
+                    for a in a_arr])),
                 extrap_order_lok=1, extrap_order_hik=1, is_logp=True)
 
         # Create galaxy tracers for each galaxy sample
@@ -132,20 +136,23 @@ class LargeScaleTomographer(object):
                       self.tracer_data[gal_name]['nz']),
                 bias=(self.tracer_data[gal_name]['z'],
                       np.ones_like(self.tracer_data[gal_name]['z'])))
-                for gal_name in self.gal_names}
+            for gal_name in self.gal_names}
 
         # Create map tracers for each map and its components
         self.map_tracers = {}
         for comp_name, tc in self.tracer_classes.items():
             if isinstance(tc, dict):
                 for map_name in self.map_names:
-                    self.map_tracers[(comp_name, map_name)] = tc[map_name](cosmo)
+                    self.map_tracers[(comp_name,
+                                      map_name)] = tc[map_name](cosmo)
             else:
                 tobj = tc(cosmo)
                 for map_name in self.map_names:
-                    self.map_tracers[(comp_name, map_name)] = tobj
+                    self.map_tracers[(comp_name,
+                                      map_name)] = tobj
 
-        # Compute the theoretical power spectra for each galaxy-map pair and component
+        # Compute the theoretical power spectra for each
+        # galaxy-map pair and component
         self.th_cls_gg = {}
         self.th_cls_gm = {}
         for gal_name in self.gal_names:
@@ -174,7 +181,8 @@ class LargeScaleTomographer(object):
                                 t_map,
                                 ell,
                                 p_of_k_a=self.pks[t])
-                            self.th_cls_gm[(gal_name, map_name, comp_name, t)] = cl*sed*beam
+                            self.th_cls_gm[(gal_name, map_name,
+                                            comp_name, t)] = cl*sed*beam
                 else:
                     # We can avoid computing all cls, since
                     # the same tracer is used for all maps.
@@ -183,13 +191,15 @@ class LargeScaleTomographer(object):
                         cl = ccl.angular_cl(
                             self.cosmo,
                             self.gal_tracers[gal_name],
-                            self.map_tracers[(comp_name, self.maps_in_x[gal_name][0])],
+                            self.map_tracers[(comp_name,
+                                              self.maps_in_x[gal_name][0])],
                             ell,
                             p_of_k_a=self.pks[t])
                         for map_name in self.maps_in_x[gal_name]:
                             sed = self.seds[(comp_name, map_name)]
                             beam = self.tracer_data[map_name]['beam'](ell)
-                            self.th_cls_gm[(gal_name, map_name, comp_name, t)] = cl*sed*beam
+                            self.th_cls_gm[(gal_name, map_name,
+                                            comp_name, t)] = cl*sed*beam
 
         # Build template matrices
         blocks = []
@@ -198,13 +208,15 @@ class LargeScaleTomographer(object):
             n_ell = len(ell)
             n_maps = len(self.maps_in_x[gal_name])
             # Galaxy auto-correlation templates
-            templates_gg = np.array([self.th_cls_gg[(gal_name, t)] for t in self.terms])
+            templates_gg = np.array([
+                self.th_cls_gg[(gal_name, t)] for t in self.terms])
             # Galaxy-map cross-correlation templates
-            templates_gm = np.array([[[self.th_cls_gm[(gal_name, map_name, comp_name, t)]
-                                       for map_name in self.maps_in_x[gal_name]]
-                                      for comp_name in self.comp_names]
-                                     for t in self.terms]).reshape([self.n_terms*self.n_comps,
-                                                                    n_maps*n_ell])
+            templates_gm = np.array([[[
+                self.th_cls_gm[(gal_name, map_name, comp_name, t)]
+                for map_name in self.maps_in_x[gal_name]]
+                for comp_name in self.comp_names]
+                for t in self.terms]).reshape([self.n_terms*self.n_comps,
+                                               n_maps*n_ell])
             blocks.append(templates_gg.T)
             blocks.append(templates_gm.T)
         self.Tmat = la.block_diag(*blocks)
@@ -233,11 +245,13 @@ class LargeScaleTomographer(object):
         theoretical templates and the covariance matrix.
 
         Args:
-            regularisation_factor: Optional regularization factor to stabilize
-                the solution. If provided, a diagonal regularization matrix is added
-                to the Fisher information matrix before solving for the amplitudes.
+            regularisation_factor: Optional regularization factor to
+                stabilize the solution. If provided, a diagonal
+                regularization matrix is added to the Fisher information
+                matrix before solving for the amplitudes.
         """
-        # Solve for the amplitudes using the generalized least squares solution
+        # Solve for the amplitudes using the generalized least
+        # squares solution
         T_iC = (self.inv_cov @ self.Tmat).T
         T_iC_T = T_iC @ self.Tmat
         T_iC_d = T_iC @ self.data
@@ -254,7 +268,8 @@ class LargeScaleTomographer(object):
     def cov_amps(self):
         """
         Return the covariance matrix of the amplitudes.
-        This is the inverse of the Fisher information matrix for the amplitudes.
+        This is the inverse of the Fisher information matrix for
+        the amplitudes.
         """
         return np.linalg.inv(self.icov_amps)
 
@@ -286,13 +301,15 @@ class LargeScaleTomographer(object):
         else:
             for comp_name in self.comp_names:
                 if comp_name not in seds:
-                    raise ValueError(f"SED for component {comp_name} not provided.")
+                    raise ValueError(
+                        f"SED for component {comp_name} not provided.")
                 sed = seds[comp_name]
                 if sed is not None:
                     for map_name in self.map_names:
                         if map_name not in sed:
-                            raise ValueError(f"SED for component {comp_name} "
-                                             f"in map {map_name} not provided.")
+                            raise ValueError(
+                                f"SED for component {comp_name} "
+                                f"in map {map_name} not provided.")
                         self.seds[(comp_name, map_name)] = sed[map_name]
                 else:
                     for map_name in self.map_names:
@@ -303,46 +320,62 @@ class LargeScaleTomographer(object):
         # Check all galaxy tracers and maps are present in the SACC file
         for gal_name in self.gal_names:
             if gal_name not in self.s.tracers:
-                raise ValueError(f"Galaxy tracer {gal_name} not found in SACC file.")
+                raise ValueError(
+                    f"Galaxy tracer {gal_name} not found in SACC file.")
 
         for map_name in self.map_names:
             if map_name not in self.s.tracers:
-                raise ValueError(f"Map {map_name} not found in SACC file.")
+                raise ValueError(
+                    f"Map {map_name} not found in SACC file.")
 
-        # If maps_in_x is not 'all', check that the specified cross-maps are valid
+        # If maps_in_x is not 'all', check that the
+        # specified cross-maps are valid
         if self.maps_in_x != 'all':
             for gal_name in self.gal_names:
                 if gal_name not in self.maps_in_x:
-                    raise ValueError(f"Galaxy tracer {gal_name} not found in maps_in_x.")
+                    raise ValueError(
+                        f"Galaxy tracer {gal_name} not found in maps_in_x.")
                 for map_name in self.maps_in_x[gal_name]:
                     if map_name not in self.map_names:
-                        raise ValueError(f"Map {map_name} in map list for "
-                                         f"galaxy tracer {gal_name} not found.")
+                        raise ValueError(
+                            f"Map {map_name} in map list for "
+                            f"galaxy tracer {gal_name} not found.")
         else:
-            # If maps_in_x is 'all', create a dictionary with all maps for each galaxy tracer
-            self.maps_in_x = {gal_name: self.map_names for gal_name in self.gal_names}
+            # If maps_in_x is 'all', create a dictionary
+            # with all maps for each galaxy tracer
+            self.maps_in_x = {gal_name: self.map_names
+                              for gal_name in self.gal_names}
 
         # Check all tracer classes are provided for each map and component
         for comp_name in self.comp_names:
             if comp_name not in self.tracer_classes:
-                raise ValueError(f"Tracer class for component {comp_name} not provided.")
+                raise ValueError(
+                    f"Tracer class for component {comp_name} not provided.")
             tc = self.tracer_classes[comp_name]
             if isinstance(tc, dict):
                 for map_name in self.map_names:
                     if map_name not in tc:
-                        raise ValueError(f"Tracer class for component {comp_name} "
-                                         f"in map {map_name} not provided.")
-            else:  # If not defined per map, then this component must have an SED
+                        raise ValueError(
+                            f"Tracer class for component {comp_name} "
+                            f"in map {map_name} not provided.")
+            else:
+                # If not defined per map, then this
+                # component must have an SED
                 if seds_input is None or comp_name not in seds_input:
-                    raise ValueError(f"SED for component {comp_name} not provided.")
+                    raise ValueError(
+                        f"SED for component {comp_name} not provided.")
 
         # Determine the appropriate cl_type for each map based on its spin
         if np.isscalar(self.map_spin):
-            self.clxtype = {m: _cltyp(self.map_spin) for m in self.map_names}
+            self.clxtype = {m: _cltyp(self.map_spin)
+                            for m in self.map_names}
         elif isinstance(self.map_spin, dict):
-            self.clxtype = {m: _cltyp(self.map_spin[m]) for m in self.map_names}
+            self.clxtype = {m: _cltyp(self.map_spin[m])
+                            for m in self.map_names}
         else:
-            raise ValueError("map_spin must be either a scalar or a dictionary mapping map names to spins.")
+            raise ValueError(
+                "map_spin must be either a scalar or a "
+                "dictionary mapping map names to spins.")
 
     def _iter_cls(self):
         for gal_name in self.gal_names:
@@ -391,16 +424,15 @@ class LargeScaleTomographer(object):
         data_vector = []
         inds = []
         for t1, t2, cl_type in self._iter_cls():
-            ell, cl, cov, ind = self.s.get_ell_cl(cl_type, t1, t2,
-                                                  return_cov=True,
-                                                  return_ind=True)
+            ell, cl, cov, ind = self.s.get_ell_cl(
+                cl_type, t1, t2, return_cov=True, return_ind=True)
             if len(ell) == 0:
-                ell, cl, cov, ind = self.s.get_ell_cl(cl_type, t2, t1,
-                                                      return_cov=True,
-                                                      return_ind=True)
+                ell, cl, cov, ind = self.s.get_ell_cl(
+                    cl_type, t2, t1, return_cov=True, return_ind=True)
             if len(ell) == 0:
-                raise ValueError(f"No data found for {t1} x {t2} in SACC file.")
-            lmax = self.tracer_data[t1]['lmax'] if t1 in self.gal_names else self.tracer_data[t2]['lmax']
+                raise ValueError(
+                    f"No data found for {t1} x {t2} in SACC file.")
+            lmax = self.tracer_data[t1]['lmax'] if t1 in self.gal_names else self.tracer_data[t2]['lmax']  # noqa: E501
             good = (ell >= self.lmin) & (ell <= lmax)
             ell = ell[good]
             cl = cl[good]
@@ -423,24 +455,28 @@ class LargeScaleTomographer(object):
             for map_name in self.maps_in_x[gal_name]:
                 ell_map = self.cl_info[(gal_name, map_name)]['ell']
                 if not np.array_equal(ell_ref, ell_map):
-                    raise ValueError(f"Ell values for {gal_name} x {map_name} "
-                                     f"do not match those for {gal_name} x {gal_name}.")
+                    raise ValueError(
+                        f"Ell values for {gal_name} x {map_name} "
+                        f"do not match those for {gal_name} x {gal_name}.")
 
     def get_linear_biases(self, nwalkers=None, nsteps=1000, burnin=200):
         """
         Compute the linear biases for each galaxy tracer and component, as well
         as their uncertainties. The linear bias for a galaxy tracer is defined
-        as the square root of the linear amplitude of its auto-correlation, while
-        the linear bias for a component is defined as the ratio of the linear
-        amplitude of its cross-correlation with a galaxy tracer to the galaxy
-        tracer's linear bias. The biases are computed by sampling the posterior
-        distribution of the amplitudes using MCMC.
+        as the square root of the linear amplitude of its auto-correlation,
+        while the linear bias for a component is defined as the ratio of the
+        linear amplitude of its cross-correlation with a galaxy tracer to the
+        galaxy tracer's linear bias. The biases are computed by sampling the
+        posterior distribution of the amplitudes using MCMC.
 
         Returns:
-            biases: A dictionary mapping galaxy tracer names to their linear biases.
-            comp_biases: A dictionary mapping component names to their linear biases.
+            biases: A dictionary mapping galaxy tracer names to their
+                linear biases.
+            comp_biases: A dictionary mapping component names to their
+                linear biases.
             samples: The MCMC samples of the biases.
-            param_names: A list of parameter names corresponding to the biases.
+            param_names: A list of parameter names corresponding to
+                the biases.
         """
         indices = []
         bf_params = []
@@ -448,7 +484,8 @@ class LargeScaleTomographer(object):
         for gal_name in self.gal_names:
             iAgg = self.amp_indices[f"{gal_name}_{gal_name}_k0"]
             indices.append(iAgg)
-            bg = np.sqrt(np.fabs(self.amps[iAgg]))  # Avoid negative square roots due to numerical issues
+            # Avoid negative square roots due to numerical issues
+            bg = np.sqrt(np.fabs(self.amps[iAgg]))
             bf_params.append(bg)
             param_names.append(f"b_{gal_name}")
             for comp_name in self.comp_names:
@@ -489,7 +526,8 @@ class LargeScaleTomographer(object):
         sampler = emcee.EnsembleSampler(nwalkers, ndim, logp)
         sampler.run_mcmc(p0, nsteps)
         samples = sampler.get_chain(discard=burnin, flat=True)
-        # Compute the mean and standard deviation of the samples for each parameter
+        # Compute the mean and standard deviation of the
+        # samples for each parameter
         means = np.mean(samples, axis=0)
         stds = np.std(samples, axis=0)
         biases = {}
@@ -499,6 +537,8 @@ class LargeScaleTomographer(object):
             biases[gal_name] = (means[i], stds[i], bf_params[i])
             i += 1
             for comp_name in self.comp_names:
-                comp_biases[(gal_name, comp_name)] = (means[i], stds[i], bf_params[i])
+                comp_biases[(gal_name,
+                             comp_name)] = (means[i], stds[i],
+                                            bf_params[i])
                 i += 1
         return biases, comp_biases, samples, param_names

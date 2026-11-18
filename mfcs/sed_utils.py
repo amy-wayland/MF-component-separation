@@ -87,7 +87,8 @@ class BPass(object):
         self.norm_fast = 1/np.trapezoid(self.tau_fast, self.nu_fast)
         self.nu_mean = self.integrate_over_tau(lambda nu: nu)
         self.unit_MJy_sr_to_K_CMB = self.integrate_over_tau(dBnudlogT)/T_CMB
-        self.unit_MJy_sr_to_K_CMB_fast = self.integrate_over_tau(dBnudlogT, fast=True)/T_CMB
+        self.unit_MJy_sr_to_K_CMB_fast = \
+            self.integrate_over_tau(dBnudlogT, fast=True)/T_CMB
 
     def integrate_over_tau(self, func, fast=False, axis=-1):
         """
@@ -106,12 +107,14 @@ class BPass(object):
         Returns
         -------
         float
-            The bandpass-integrated value in the same units as the input function.
+            The bandpass-integrated value in the same units as
+            the input function.
         """
         if fast:
             return np.trapezoid(func(self.nu_fast)*self.tau_fast,
                                 self.nu_fast, axis=axis)*self.norm_fast
-        return np.trapezoid(func(self.nu)*self.tau, self.nu, axis=axis)*self.norm
+        return np.trapezoid(func(self.nu)*self.tau, self.nu,
+                            axis=axis)*self.norm
 
     def convolve(self, sed_func, fast=False, axis=-1):
         """
@@ -133,5 +136,9 @@ class BPass(object):
             The bandpass-convolved SED value in units of K_CMB.
         """
         if fast:
-            return self.integrate_over_tau(sed_func, fast=True, axis=axis)/self.unit_MJy_sr_to_K_CMB_fast
-        return self.integrate_over_tau(sed_func, fast=fast, axis=axis)/self.unit_MJy_sr_to_K_CMB
+            return self.integrate_over_tau(
+                sed_func, fast=True,
+                axis=axis)/self.unit_MJy_sr_to_K_CMB_fast
+        return self.integrate_over_tau(
+            sed_func, fast=fast,
+            axis=axis)/self.unit_MJy_sr_to_K_CMB
