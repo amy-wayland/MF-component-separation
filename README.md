@@ -34,17 +34,31 @@ CIB SED model.
 
 ## Installation
 
-The package has no installer yet. Clone the repository and either run from
-its root directory or add it to your `PYTHONPATH`:
+Clone the repository and install it with `pip`:
 
 ```bash
-git clone <repo-url> MF-component-separation
-export PYTHONPATH=$PYTHONPATH:/path/to/MF-component-separation
+git clone https://github.com/amy-wayland/MF-component-separation.git
+cd MF-component-separation
+pip install .
 ```
+
+Use `pip install -e .` for an editable (development) install. To also install
+the packages needed to run the example notebooks, use
+`pip install ".[examples]"`.
+
+`pyccl` contains compiled code. If installing it with `pip` fails, install it
+with conda first (`conda install -c conda-forge pyccl`) and then run
+`pip install .`.
+
+Then, in Python:
 
 ```python
 import mfcs
 ```
+
+The data files in `data/` (Planck bandpasses and the SIDES SED library) are
+not installed with the package. The example notebooks load them with paths
+relative to the repository root, so run the notebooks from there.
 
 ### Dependencies
 
@@ -54,10 +68,12 @@ import mfcs
 | [`sacc`](https://github.com/LSSTDESC/sacc)  | Input data vectors, covariances, tracers and bandpower windows |
 | [`pyccl`](https://github.com/LSSTDESC/CCL) | Theory templates in `LargeScaleTomographer` |
 | [`emcee`](https://emcee.readthedocs.io)     | Bias posterior sampling in `LargeScaleTomographer.get_linear_biases` |
-| `healpy`, `matplotlib` | Used only in the example notebooks (beams, pixel windows, plots) |
+| `healpy`, `matplotlib` | Used only in the example notebooks (beams, pixel windows, plots); installed with the `examples` extra |
 
-Tested with numpy 2.5, scipy 1.18, sacc 2.4, pyccl 3.3, emcee 3.1. Note that
-`np.trapezoid` requires numpy ≥ 2.0.
+`pip install .` installs all the packages above except `healpy` and
+`matplotlib`. The code requires Python ≥ 3.10 and numpy ≥ 2.0 (it uses
+`np.trapezoid`). It has been tested with numpy 2.5, scipy 1.18, sacc 2.4,
+pyccl 3.3 and emcee 3.1.
 
 ---
 
