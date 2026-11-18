@@ -1,11 +1,11 @@
 import numpy as np
 import scipy.linalg as la
 import sacc
-from utils import _cltyp, _ones
+from .utils import _cltyp, _ones
 from scipy.interpolate import interp1d
 
 
-class MLBR(object):
+class MaxLikeBandpowerReconstructor(object):
     def __init__(self, sacc_file, lss_names, map_names, comp_names,
                  seds, maps_in_x, lmax, lmin, lss_spin,
                  beam_correction_kind='mid'):

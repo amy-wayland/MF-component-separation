@@ -3,7 +3,7 @@ import pyccl as ccl
 from scipy.interpolate import interp1d
 import scipy.linalg as la
 import scipy.stats as stats
-from utils import _cltyp, _ones
+from .utils import _cltyp, _ones
 
 
 class LargeScaleTomographer(object):

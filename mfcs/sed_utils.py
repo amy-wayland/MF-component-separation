@@ -2,25 +2,22 @@ import numpy as np
 
 
 # Note: the following units are assumed throughout
-#  - Temperatures are in Kelvin
+#  - Temperatures are in Kelvin (including temperature maps)
 #  - Frequencies are in GHz
 #  - Intensities are in MJy/sr
 
 
 J_m2_to_MJy = 1E20  # Conversion from J/m^2 to MJy
-# T_CMB = 2.7255
-# T_CMB_uK = 2.7255E6
-# hPlanck = 6.62607015E-25  # Units of J / GHz
-# kBoltz = 1.380649E-23  # Units of J / K
+T_CMB = 2.7255
+hPlanck = 6.62607015E-25  # Units of J / GHz
+kBoltz = 1.380649E-23  # Units of J / K
 clight = 0.299792458  # Units of m * GHz
 
 # These are the constants used in pyilc. Using the above values,
 # results (e.g. for the convolved tSZ SED) differ by up to 1%.
-T_CMB = 2.726
-T_CMB_uK = 2.726E6
-hPlanck=6.626068e-25
-kBoltz=1.3806503e-23
-#clight=299792458.0
+# T_CMB = 2.726
+# hPlanck=6.626068e-25
+# kBoltz=1.3806503e-23
 
 
 def BnuBB(nu, T=T_CMB, get_x=False):
