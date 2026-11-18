@@ -263,8 +263,10 @@ bg, bU, samples, names = tomo.get_linear_biases(nsteps=10000, burnin=2000)
 * `cosmo`: a `pyccl.Cosmology` (default: `CosmologyVanillaLCDM`). Call
   `tomo.update_cosmo(cosmo)` to recompute the templates and amplitudes for a
   different cosmology.
-* `beam_corrected_in_sacc`: set to `True` if the spectra in the sacc file have
-  already been beam-deconvolved.
+* `beam_correction_kind`: how map beams are applied to the galaxy-map
+  templates. The options are `'mid'` (default), `'bpw'` and `'none'`, and they
+  mean the same as in `MaxLikeBandpowerReconstructor`. Use `'none'` if the
+  spectra in the sacc file are already beam-deconvolved.
 * `amp_indices`: maps amplitude names of the form `'{gal}_{gal}_{term}'` and
   `'{gal}_{comp}_{term}'` to their index in `tomo.amps`.
 

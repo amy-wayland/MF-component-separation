@@ -1,10 +1,86 @@
 import numpy as np
 import scipy.linalg as la
-from .utils import _cltyp, _ones
-from scipy.interpolate import interp1d
+from .utils import (_cltyp, _ones, _beam_interpolator,
+                    _check_beam_correction_kind, _eval_beam)
 
 
 class MaxLikeBandpowerReconstructor(object):
+    """
+    A class for performing maximum-likelihood bandpower reconstruction
+    (MLBR). Given the cross-power spectra between a set of LSS tracers
+    and a set of (e.g. multi-frequency) maps, it reconstructs the
+    cross-power spectra between each LSS tracer and each of the sky
+    components contributing to the maps.
+
+    For each LSS tracer g, the cross-power spectrum with map m is modelled
+    as a linear combination of the component cross-spectra:
+
+        C_ell^{gm} = B^m_ell * sum_c S^g_c(m) * C_ell^{gc},
+
+    where S^g_c(m) is the SED of component c in map m (which may depend on
+    the LSS tracer), and B^m_ell is the beam of map m. Writing this as
+    d = S c + n, the maximum-likelihood solution for the component
+    bandpowers c, and its covariance, are
+
+        c = (S^T C^{-1} S)^{-1} S^T C^{-1} d,
+        Cov(c) = (S^T C^{-1} S)^{-1},
+
+    where C is the covariance of the data vector d.
+
+    Args:
+        sacc_file: A SACC file containing the data and covariance.
+        lss_names: List of LSS tracer names in the SACC file.
+        map_names: List of map names in the SACC file.
+        comp_names: List of component names to be separated. The assumption
+            is that all maps listed in `map_names` are linear combinations of
+            all components listed in `comp_names`.
+        seds: Dictionary of SEDs, already integrated over the bandpass of
+            each map and in the units of the map. For each component in
+            `comp_names`, the corresponding entry can be either:
+            1. A dictionary mapping map names to SED values. In this case,
+               the same SED is used for all LSS tracers (e.g. tSZ).
+            2. A nested dictionary mapping LSS tracer names to dictionaries
+               that map map names to SED values. In this case, a different
+               SED can be used for each LSS tracer (e.g. CIB, whose
+               effective SED depends on the redshift kernel of the LSS
+               tracer). In this case, an SED must be provided for all LSS
+               tracers.
+            SEDs must be provided for all maps cross-correlated with each
+            LSS tracer.
+        maps_in_x: Either 'all' or a dictionary mapping LSS tracer names
+            to lists of map names for cross-correlations. If 'all', all
+            maps in `map_names` are used for cross-correlations with each
+            LSS tracer.
+        lmax: Maximum ell value for the analysis. If a single number, this
+            scale cut is applied to all maps. Otherwise, this should be a
+            dictionary mapping map names to their respective scale cuts,
+            which allows e.g. noisy or contaminated maps to be cut at
+            lower ell.
+        lmin: Minimum ell value for the analysis.
+        lss_spin: Spin of the LSS tracers. This may be a single value or a
+            dictionary mapping LSS tracer names to spins. In all cases,
+            allowed spin values are 0, 2, 'e', and 'b'. If 0, the tracer
+            is assumed to be a scalar field. If 2, the tracer is assumed to
+            be a spin-2 field, and only its E-mode component is used. If
+            'e' or 'b', cross-correlations with the corresponding spin
+            component will be used.
+        beam_correction_kind: How to include the map beams in the model.
+            Beams are read from the `beam` attribute of each map tracer
+            (assumed to be 1 for tracers without one). If 'mid', the beam
+            is evaluated at the effective ell of each bandpower. If 'bpw',
+            the beam is averaged over the bandpower window functions stored
+            in the SACC file. If 'none', no beam is applied, e.g. because
+            the power spectra in the SACC file are already beam-deconvolved
+            (default is 'mid').
+
+    The reconstructed component bandpowers for each LSS tracer are
+    defined on `common_ells[lss_name]`: the union of the ell values of
+    all its cross-correlations surviving the scale cuts. These must be
+    the same bandpowers across maps, except for different scale cuts.
+    The output vector of component bandpowers is ordered by LSS tracer,
+    then by component, then by ell. Use `get_component_indices` to
+    extract the bandpowers for a given LSS tracer and component.
+    """
     def __init__(self, sacc_file, lss_names, map_names, comp_names,
                  seds, maps_in_x, lmax, lmin, lss_spin,
                  beam_correction_kind='mid'):
@@ -25,12 +101,29 @@ class MaxLikeBandpowerReconstructor(object):
         self.update_seds(seds)
 
     def get_component_indices(self, lss_name, comp_name):
+        """
+        Return the indices of the reconstructed bandpowers for a given
+        LSS tracer and component in the vector of component bandpowers
+        (and its covariance) returned by `get_component_cls`. The
+        corresponding ell values are `common_ells[lss_name]`.
+
+        Args:
+            lss_name: Name of the LSS tracer.
+            comp_name: Name of the component.
+
+        Returns:
+            inds: Array of indices.
+        """
         if (lss_name, comp_name) not in self.comp_inds:
             raise ValueError(f"Component indices for LSS tracer {lss_name} "
                              f"and component {comp_name} not found.")
         return self.comp_inds[(lss_name, comp_name)]
 
     def _build_comp_indices(self):
+        """
+        Build a dictionary mapping (LSS tracer, component) pairs to the
+        indices of their bandpowers in the component bandpower vector.
+        """
         self.comp_inds = {}
         i_yet = 0
         for lss_name in self.lss_names:
@@ -42,6 +135,15 @@ class MaxLikeBandpowerReconstructor(object):
                 i_yet += n_ells
 
     def update_seds(self, seds):
+        """
+        Update the SEDs for the components and rebuild the mixing matrix.
+        This does not require re-reading the data, and can therefore be
+        used e.g. to marginalise over SED parameters.
+
+        Args:
+            seds: Dictionary of SEDs, in the same format as the `seds`
+                argument of the class constructor.
+        """
         seds_full = {}
         # Check all components have SEDs
         for comp_name in self.comp_names:
@@ -81,6 +183,7 @@ class MaxLikeBandpowerReconstructor(object):
         self._build_s_matrix()
 
     def _check_sanity(self):
+        """ Check that the provided inputs are consistent and valid."""
         # Check that all lss tracers exist in the sacc file
         for lss_name in self.lss_names:
             if lss_name not in self.s.tracers:
@@ -114,7 +217,7 @@ class MaxLikeBandpowerReconstructor(object):
             self.clxtype = {n: _cltyp(self.lss_spin)
                             for n in self.lss_names}
         elif isinstance(self.lss_spin, dict):
-            self.clxtype = {n: _cltyp(self.map_spin[n])
+            self.clxtype = {n: _cltyp(self.lss_spin[n])
                             for n in self.lss_names}
         else:
             raise ValueError("lss_spin must be either a scalar or a "
@@ -129,37 +232,24 @@ class MaxLikeBandpowerReconstructor(object):
                 raise ValueError(f"Map tracer {m} not found in lmax.")
 
         # Check beam correction type
-        if self.beam_correction_kind in ['None', None]:
-            self.beam_correction_kind = 'none'
-        if self.beam_correction_kind not in ['mid', 'bpw', 'none']:
-            raise ValueError(
-                f"Unkown beam correction kind {self.beam_correction_kind}. "
-                f"Must be one of 'mid', 'bpw', or 'none'.")
+        self.beam_correction_kind = _check_beam_correction_kind(
+            self.beam_correction_kind)
 
     def _collect_tracer_data(self):
+        """ Collect the beam of each map."""
         self.tracer_data = {}
         for map_name in self.map_names:
             t = self.s.tracers[map_name]
             if hasattr(t, 'beam'):
-                # Extrapolate to 1 at low ell and 0 at high ell
-                beam = interp1d(t.ell, t.beam,
-                                bounds_error=False,
-                                fill_value=(1.0, 0.0))
+                beam = _beam_interpolator(t.ell, t.beam)
             else:
                 beam = _ones
             self.tracer_data[map_name] = {'beam': beam}
 
-    def _eval_beam(self, beamf, ells, inds):
-        if self.beam_correction_kind == 'mid':
-            return beamf(ells)
-        elif self.beam_correction_kind == 'bpw':
-            bpw = self.s.get_bandpower_windows(inds)
-            bl = beamf(bpw.values)
-            return np.einsum('ij,i->j', bpw.weight, bl)
-        elif self.beam_correction_kind == 'none':
-            return np.ones(len(ells))
-
     def _get_data_vector(self):
+        """ Collect the data vector and covariance matrix from the SACC
+        file for all relevant cross-correlations, apply scale cuts, and
+        evaluate the beam for each of them."""
         self.cl_info = {}
         self.common_ells = {}
         data_vector = []
@@ -186,8 +276,8 @@ class MaxLikeBandpowerReconstructor(object):
                 inds_this.append(ind)
                 data_vector.append(cl)
                 inds.append(ind)
-                beam = self._eval_beam(self.tracer_data[map_name]['beam'],
-                                       ell, ind)
+                beam = _eval_beam(self.s, self.tracer_data[map_name]['beam'],
+                                  ell, ind, self.beam_correction_kind)
                 self.cl_info[(lss_name, map_name)] = {
                     'ell': ell, 'cl': cl, 'cov': cov, 'ind': ind,
                     'n_ells': len(ell), 'beam': beam}
@@ -210,6 +300,10 @@ class MaxLikeBandpowerReconstructor(object):
         self.inv_cov = np.linalg.inv(self.cov)
 
     def _build_s_matrix(self):
+        """ Build the mixing matrix S, which maps the component bandpowers
+        into the data vector. S is block-diagonal, with one block per LSS
+        tracer containing the beam-weighted SED of each component in each
+        map."""
         blocks = []
         for lss_name in self.lss_names:
             ells_common = self.common_ells[lss_name]
@@ -234,8 +328,23 @@ class MaxLikeBandpowerReconstructor(object):
         self.Smat = la.block_diag(*blocks)
 
     def get_component_cls(self, get_cov=False):
-        # Compute the component C_ell's using the formula:
-        # C_comp = (S^T C^{-1} S)^{-1} S^T C^{-1} d
+        """
+        Compute the maximum-likelihood component bandpowers:
+
+            c = (S^T C^{-1} S)^{-1} S^T C^{-1} d.
+
+        Args:
+            get_cov: If True, also return the covariance matrix of the
+                component bandpowers, (S^T C^{-1} S)^{-1}
+                (default is False).
+
+        Returns:
+            comp_cls: Vector of component bandpowers. Use
+                `get_component_indices` to extract the bandpowers for a
+                given LSS tracer and component.
+            comp_cov: Covariance matrix of `comp_cls` (only returned if
+                `get_cov` is True).
+        """
         St_Cinv = (self.inv_cov @ self.Smat).T
         St_Cinv_S = St_Cinv @ self.Smat
         St_Cinv_d = St_Cinv @ self.data_vector

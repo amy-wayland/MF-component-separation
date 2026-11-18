@@ -1,9 +1,9 @@
 import numpy as np
 import pyccl as ccl
-from scipy.interpolate import interp1d
 import scipy.linalg as la
 import scipy.stats as stats
-from .utils import _cltyp, _ones
+from .utils import (_cltyp, _ones, _beam_interpolator,
+                    _check_beam_correction_kind, _eval_beam)
 
 
 class LargeScaleTomographer(object):
@@ -63,12 +63,19 @@ class LargeScaleTomographer(object):
             vanilla LCDM cosmology is used (default is `None`).
         include_stochasticity: Whether to include a stochastic term in the
             model. (default is True).
+        beam_correction_kind: How to include the map beams in the model
+            for the galaxy-map cross-correlations. If 'mid', the beam is
+            evaluated at the effective ell of each bandpower. If 'bpw', the
+            beam is averaged over the bandpower window functions stored in
+            the SACC file. If 'none', no beam is applied, e.g. because the
+            power spectra in the SACC file are already beam-deconvolved
+            (default is 'mid').
     """
     def __init__(self, sacc_file, gal_names, map_names, comp_names,
                  tracer_classes, maps_in_x='all', seds=None,
                  n_max=1, kmax=0.3, lmax=None, lmin=0, map_spin=0,
                  cosmo=None, include_stochasticity=True,
-                 beam_corrected_in_sacc=False):
+                 beam_correction_kind='mid'):
         self.s = sacc_file
         self.gal_names = gal_names
         self.map_names = map_names
@@ -84,7 +91,8 @@ class LargeScaleTomographer(object):
         self.lmax = lmax
         self.lmin = lmin
         self.map_spin = map_spin
-        self.beam_corrected_in_sacc = beam_corrected_in_sacc
+        self.beam_correction_kind = _check_beam_correction_kind(
+            beam_correction_kind)
         if cosmo is None:
             cosmo = ccl.CosmologyVanillaLCDM()
 
@@ -173,7 +181,7 @@ class LargeScaleTomographer(object):
                     for map_name in self.maps_in_x[gal_name]:
                         t_map = self.map_tracers[(comp_name, map_name)]
                         sed = self.seds[(comp_name, map_name)]
-                        beam = self.tracer_data[map_name]['beam'](ell)
+                        beam = self.cl_info[(gal_name, map_name)]['beam']
                         for t in self.terms:
                             cl = ccl.angular_cl(
                                 self.cosmo,
@@ -197,7 +205,7 @@ class LargeScaleTomographer(object):
                             p_of_k_a=self.pks[t])
                         for map_name in self.maps_in_x[gal_name]:
                             sed = self.seds[(comp_name, map_name)]
-                            beam = self.tracer_data[map_name]['beam'](ell)
+                            beam = self.cl_info[(gal_name, map_name)]['beam']
                             self.th_cls_gm[(gal_name, map_name,
                                             comp_name, t)] = cl*sed*beam
 
@@ -407,12 +415,7 @@ class LargeScaleTomographer(object):
         for map_name in self.map_names:
             t = self.s.tracers[map_name]
             if hasattr(t, 'beam'):
-                if self.beam_corrected_in_sacc:
-                    beam = _ones
-                else:
-                    beam = interp1d(t.ell, t.beam,
-                                    bounds_error=False,
-                                    fill_value=1.0)
+                beam = _beam_interpolator(t.ell, t.beam)
             else:
                 beam = _ones
             self.tracer_data[map_name] = {'beam': beam}
@@ -441,6 +444,11 @@ class LargeScaleTomographer(object):
             self.cl_info[(t1, t2)] = {'n': len(ell), 'ell': ell,
                                       'cl': cl, 'cov': cov,
                                       'ind': ind}
+            if t2 in self.map_names:
+                # Beam for galaxy-map cross-correlations
+                self.cl_info[(t1, t2)]['beam'] = _eval_beam(
+                    self.s, self.tracer_data[t2]['beam'], ell, ind,
+                    self.beam_correction_kind)
             data_vector.append(cl)
             inds.append(ind)
         self.data = np.concatenate(data_vector)
